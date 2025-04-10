@@ -94,7 +94,7 @@ set linesize 100
 \begin{document}
 
 % Title and Author
-\title{Code for the manuscript titled Lifetime association of systolic blood pressure and quality adjusted life years: a mendelian randomisation study.}
+\title{Code for the manuscript titled Causal association between systolic blood pressure and quality-adjusted life years: a mendelian randomisation study.}
 \author{Tamrat Befekadu Abebe\thanks{Centre for Medicine Use and Safety, Faculty of Pharmacy and Pharmaceutical Sciences, Monash University, \href{mailto:tamrat.abebe@monash.edu}{tamrat.abebe@monash.edu}}}
 \date{\today}
 
@@ -125,7 +125,7 @@ This study is supported by the National Health and Medical Research Council Idea
 \newpage
 
 \section{Preface}
-This document presented the code and workflow for the manuscript titled *Lifetime association of systolic blood pressure and quality-adjusted life years: a Mendelian randomisation study*. It detailed the data preparation (cleaning) that was performed using a dataset provided by the UK Biobank. This study was approved by the Research Ethics Committee (REC reference for UK Biobank is 11/NW/0382) of National Committee North West-Haydock, National Health Service, UK.
+This document presented the code and workflow for the manuscript titled *Causal association between systolic blood pressure and quality-adjusted life years: a mendelian randomisation study*. It detailed the data preparation (cleaning) that was performed using a dataset provided by the UK Biobank. This study was approved by the Research Ethics Committee (REC reference for UK Biobank is 11/NW/0382) of National Committee North West-Haydock, National Health Service, UK.
 
 To generate this document, the Stata package \texttt{texdoc} was used, which is available at: \color{blue} \url{http://repec.sowi.unibe.ch/stata/texdoc/}.
 \color{black}
