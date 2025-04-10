@@ -6,4 +6,4 @@
 - `mr_sbp_qalys.do`: Original **Stata** code, with embedded **R**, **Python**, and **PLINK2** scripts.
 - `mr_sbp_qalys.tex`: The **LaTeX** source file containing the full protocol and embedded code in **Stata**, **R**, **Python**, and **PLINK2** formats.
 
-📬 **Contact:** [tamrat.abebe@monash.edu](mailto:tamrat.abebe@monash.edu) or [tamrat.abebe1@monash.edu](mailto:tamrat.abebe1@monash.edu)if you need help.
+📬 **Contact:** [tamrat.abebe@monash.edu](mailto:tamrat.abebe@monash.edu) or [tamrat.abebe1@monash.edu](mailto:tamrat.abebe1@monash.edu) if you need help.
