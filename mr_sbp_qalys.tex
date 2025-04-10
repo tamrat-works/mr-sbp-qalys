@@ -1,0 +1,1496 @@
+\documentclass[11pt]{article}
+\usepackage{ragged2e}
+\usepackage{parskip}
+\usepackage{fullpage}
+\usepackage{siunitx}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{dcolumn}
+\usepackage[breaklinks=true]{hyperref}  
+\usepackage{underscore}  
+\usepackage{stata}
+\usepackage[x11names]{xcolor}
+\usepackage{natbib}
+\usepackage{chngcntr}
+\usepackage{pgfplotstable}
+\usepackage{pdflscape}
+\usepackage{multirow}
+\usepackage{listings}
+\usepackage{xcolor} % For syntax highlighting colors
+
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{etoolbox}
+\usepackage{lipsum}
+
+% --- Setup for deeper section ---
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+
+% --- Define subsubsubsection ---
+\titleclass{\subsubsubsection}{straight}[\subsubsection]
+\newcounter{subsubsubsection}[subsubsection]
+\renewcommand\thesubsubsubsection{\thesubsubsection.\arabic{subsubsubsection}}
+
+\titleformat{\subsubsubsection}
+  {\normalfont\normalsize\bfseries}{\thesubsubsubsection}{1em}{}
+\titlespacing*{\subsubsubsection}
+  {0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+
+% --- TOC fix ---
+\makeatletter
+\newcommand{\l@subsubsubsection}{\@dottedtocline{4}{7em}{4em}}
+\makeatother
+
+\pretocmd{\tableofcontents}{%
+  \addtocontents{toc}{\protect\renewcommand{\protect\l@subsubsubsection}{\protect\@dottedtocline{4}{7em}{4em}}}%
+}{}{}
+
+\def\UrlBreaks{\do\/\do-\do_}
+% Define R style
+\lstdefinestyle{Rstyle}{
+    language=R,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    breaklines=true,
+    showstringspaces=false
+}
+
+% Define Python style
+\lstdefinestyle{PythonStyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    breaklines=true,
+    showstringspaces=false
+}
+
+\lstdefinestyle{BashStyle}{
+    language=bash,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red},
+    breaklines=true,
+    frame=single,
+    showstringspaces=false
+}
+
+
+\begin{document}
+
+% Title and Author
+\title{Code for the manuscript titled Lifetime association of systolic blood pressure and quality adjusted life years: a mendelian randomisation study.}
+\author{Tamrat Befekadu Abebe\thanks{Centre for Medicine Use and Safety, Faculty of Pharmacy and Pharmaceutical Sciences, Monash University, \href{mailto:tamrat.abebe@monash.edu}{tamrat.abebe@monash.edu}}}
+\date{\today}
+
+% Title page
+\maketitle
+\newpage % Start content on a new page 
+
+% Table of Contents
+\tableofcontents
+\newpage % Start content on a new page
+
+\section{Acknowledgement}
+
+Firstly, I would like to express my deepest gratitude to \textbf{Professor Zanfina Ademi} for her exceptional supervision, unwavering support, and for giving me the opportunity to work on this project. Her guidance has been instrumental throughout the entire journey.
+
+I am also sincerely thankful to \textbf{Dr. Jedidiah I. Morton} for his consistent encouragement, insightful advice, and for continually inspiring me to expand my skillset.
+
+My heartfelt thanks go to \textbf{Dr. Padraig Dixon} for his invaluable input, particularly in guiding the analysis of the data, which significantly enhanced the quality of this work.
+
+Lastly, I would like to thank \textbf{Dr. Jenni Ilomaki} for her helpful feedback and constructive comments on the overall project.
+
+I gratefully acknowledge \textbf{Mr. Adam Livori} for being a source of inspiration to work in TeXdoc and LaTeX, and for the time he generously invested in guiding me through the essential materials for setting up this documentation.
+
+In addition, I acknowledge the work of \textbf{Sean Harrison and colleagues}\cite{harrison2021long}, from whom the current Stata code was adapted. GitHub link: \color{blue}\url{https://github.com/seanharrison-bristol/Robust-causal-inference-for-long-term-policy-decisions}.\color{black}
+
+This study is supported by the National Health and Medical Research Council Ideas Grants Application ID: 2012582. The funder had no input into the design of the study or decision to submit for publication.
+\color{black}
+\newpage
+
+\section{Preface}
+This document presented the code and workflow for the manuscript titled *Lifetime association of systolic blood pressure and quality-adjusted life years: a Mendelian randomisation study*. It detailed the data preparation (cleaning) that was performed using a dataset provided by the UK Biobank. This study was approved by the Research Ethics Committee (REC reference for UK Biobank is 11/NW/0382) of National Committee North West-Haydock, National Health Service, UK.
+
+To generate this document, the Stata package \texttt{texdoc} was used, which is available at: \color{blue} \url{http://repec.sowi.unibe.ch/stata/texdoc/}.
+\color{black}
+
+Our code is also available at:\color{blue}\url{https://github.com/tamrat-works/mr-sbp-qalys}. 
+\color{black} 
+
+\color{black}  
+\newpage
+\section{Introduction}
+
+
+Hypertension has long been recognised as a major risk factor for heart disease due to both oxidative and mechanical stress exerted on the arterial wall\cite{brown2020risk}. A recent study reported that for every 10 mmHg increase in systolic blood pressure (SBP), there was a 53\% higher risk of atherosclerotic cardiovascular disease\cite{whelton2020association}. Mendelian randomisation (MR) studies have also demonstrated a lifetime causal association between SBP and cardiovascular disease\cite{ference2019association, wan2021blood}.
+
+However, a gap remained in the literature regarding the lifetime causal association between SBP and health-related quality of life (HRQoL). One possible approach to demonstrate this causal association could have been a randomised controlled trial (RCT). However, the feasibility of conducting such trials, along with the limited generalisability of their findings, may hinder their applicability. An alternative approach was to conduct an observational study, which is often more cost-effective and may yield findings generalisable to the broader population. Nonetheless, observational studies carry inherent limitations, such as confounding and reverse causation\cite{lawlor2008mendelian}.
+
+Mendelian randomisation offered a potential solution to these limitations by using genetic variants as instrumental variables for modifiable traits (i.e., risk factors) associated with outcomes. These outcomes could include clinical conditions (e.g., coronary artery disease) or HRQoL.
+
+This document was developed to showcase the application of MR techniques to investigate the lifetime association between SBP and HRQoL using data from the UK Biobank. HRQoL data were sourced from\cite{sullivan2011catalogue}. The following steps were undertaken to conduct the study.
+
+\section{Steps}
+
+\begin{itemize}
+\item Step 1: Working on Phenotype data
+\item Step 2: Working on Genotype data 
+\item Step 3: Combining Phenotype and Genotype data
+\item Step 4: Main analysis
+\item Step 5: Sensitivity analyses
+\item Step 6: Secondary analysis
+\item Step 7: Tables and Figures 
+\end{itemize}
+\newpage
+
+\subsection{Step 1: Working on Phenotype data}
+\subsubsection{Main dataset import}
+
+The UK Biobank main dataset contained phenotype data for participants enrolled in the study. Briefly, more than 500,000 individuals were recruited across 22 centres in the UK between 2006 and 2010\cite{sudlow2015uk}. Hospital admission data and primary care data (general practice) for UK Biobank participants were linked to Hospital Episode Statistics (HES) in England and Scottish Morbidity Records (SMR) in Scotland up to 31 October 2022, and to the Patient Episode Database for Wales (PEDW) up to 26 May 2022.
+
+Importing the entire dataset into STATA required significant time and computational resources. Therefore, it was more efficient to first select the key variables relevant to the study using the data dictionary.
+
+For those primarily using the UK Biobank Research Analysis Platform (UKB RAP), data extraction was carried out through DNAnexus's JupyterLab environment, specifically using Spark JupyterLab. The following lines of Python code were used to extract the necessary variables.
+
+\color{violet}
+\begin{lstlisting}[style=PythonStyle]
+
+# Building cohorts using Spark JupyterLab
+
+# Folders  
+exome_folder = 'Population level exome OQFE variants, PLINK format - interim 450k release'
+exome_field_id = '23149'
+output_dir = '/Data/'
+
+# Import important variables
+import os
+
+# Set environment variable before importing pyspark
+os.environ['PYARROW_IGNORE_TIMEZONE'] = '1'
+
+# Import necessary libraries
+import pyspark
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+import dxpy
+import dxdata
+import pandas as pd
+import re
+
+# Initialize Spark
+# Spark initialization (Done only once; do not rerun this cell unless you select Kernel -> Restart kernel).
+sc = pyspark.SparkContext()
+spark = pyspark.sql.SparkSession(sc)
+
+# Automatically discover dispensed dataset ID and load the dataset
+dispensed_dataset = dxpy.find_one_data_object(
+    typename="Dataset", 
+    name="app*.dataset", 
+    folder="/", 
+    name_mode="glob"
+)
+dispensed_dataset_id = dispensed_dataset["id"]
+dataset = dxdata.load_dataset(id=dispensed_dataset_id)
+
+dataset.entities
+
+participant = dataset['participant']
+
+main_cohort = dxdata.load_cohort("/cohort/pheno")
+
+field_names = [
+    'eid', 'p31', 'p22001', 'p21022', 'p21003_i0', 'p738_i0', 'p22019', 'p22021', 'p53_i0', 'p40000_i0', 'p22018', 
+    'p22011_a0', 'p22011_a1', 'p22011_a2', 'p22011_a3', 'p22011_a4', 'p22012_a0', 'p22012_a1', 'p22012_a2', 
+    'p22012_a3', 'p22012_a4', 'p22013_a0', 'p22013_a1', 'p22013_a2', 'p22013_a3', 'p22013_a4', 'p22020', 
+    'p21000_i0', 'p48_i0', 'p49_i0', 'p50_i0', 'p54_i0', 'p4079_i0_a0', 'p4080_i0_a0', 'p4080_i0_a1', 
+    'p93_i0_a0', 'p93_i0_a1', 'p4079_i0_a1', 'p94_i0_a0', 'p94_i0_a1', 'p20117_i0', 'p20160_i0', 'p21001_i0', 
+    'p21002_i0', 'p22000', 'p22007', 'p22008', 'p22003', 'p22027', 'p22004', 'p40007_i0', 'p26201_a0', 
+    'p26201_a1', 'p26201_a2', 'p26201_a3', 'p22009_a1', 'p22009_a2', 'p22009_a3', 'p22009_a4', 'p22009_a5', 
+    'p22009_a6', 'p22009_a7', 'p22009_a8', 'p22009_a9', 'p22009_a10', 'p22009_a11', 'p22009_a12', 'p22009_a13', 
+    'p22009_a14', 'p22009_a15', 'p22009_a16', 'p22009_a17', 'p22009_a18', 'p22009_a19', 'p22009_a20', 
+    'p22009_a21', 'p22009_a22', 'p22009_a23', 'p22009_a24', 'p22009_a25', 'p22009_a26', 'p22009_a27', 
+    'p22009_a28', 'p22009_a29', 'p22009_a30', 'p22009_a31', 'p22009_a32', 'p22009_a33', 'p22009_a34', 
+    'p22009_a35', 'p22009_a36', 'p22009_a37', 'p22009_a38', 'p22009_a39', 'p22009_a40', 'p20002_i0_a0', 
+    'p20002_i0_a1', 'p20002_i0_a2', 'p20002_i0_a3', 'p20002_i0_a4', 'p20002_i0_a5', 'p20002_i0_a6', 
+    'p20002_i0_a7', 'p20002_i0_a8', 'p20002_i0_a9', 'p20002_i0_a10', 'p20002_i0_a11', 'p20002_i0_a12', 
+    'p20002_i0_a13', 'p20002_i0_a14', 'p20002_i0_a15', 'p20002_i0_a16', 'p20002_i0_a17', 'p20002_i0_a18', 
+    'p20002_i0_a19', 'p20002_i0_a20', 'p20002_i0_a21', 'p20002_i0_a22', 'p20002_i0_a23', 'p20002_i0_a24', 
+    'p20002_i0_a25', 'p20002_i0_a26', 'p20002_i0_a27', 'p20002_i0_a28', 'p20002_i0_a29', 'p20002_i0_a30', 
+    'p20002_i0_a31', 'p20002_i0_a32', 'p20002_i0_a33', 'p120098', 'p120099', 'p120100', 'p120101', 'p120102', 
+    'p120103', 'p120128', 'p29150', 'p29151', 'p29152', 'p29153', 'p29154', 'p29155', 'p29206', 'fid', 
+    'p6153_i0', 'p6153_i0_a1', 'p6153_i0_a2', 'p6153_i0_a3', 'p6177_i0', 'p6177_i0_a1', 'p6177_i0_a2', 
+    'p6138_i0', 'p34_i0_a0', 'p189_i0_a0', 'p30690_i0', 'p30691_i0', 'p30760_i0', 'p30761_i0', 'p30780_i0', 
+    'p30781_i0', 'p30870_i0', 'p30871_i0'
+]
+
+df_main_cohort = participant.retrieve_fields(names=field_names, engine=dxdata.connect())
+
+print("Initial columns:", df_main_cohort.columns)
+
+# Rename columns for better readability
+df_main_cohort = df_main_cohort.withColumnRenamed("eid", "IID")
+
+# Add FID column -- required input format for regenie 
+print(type(df_main_cohort))
+
+df_main_cohort = df_main_cohort.withColumn('FID', col('IID'))
+
+df_main_cohort.show()
+
+df_main_cohort_pandas = df_main_cohort.toPandas()
+
+df_main_cohort_pandas.shape
+df_main_cohort_pandas.p31.value_counts()
+
+print("Initial columns:", df_main_cohort_pandas.columns)
+
+# Get WES
+path_to_family_file = f'/mnt/project/Bulk/Exome sequences/{exome_folder}/ukb{exome_field_id}_c1_b0_v1.fam'
+plink_fam_df = pd.read_csv(path_to_family_file, delimiter='\s', dtype='object',                           
+                           names=['FID','IID','Father ID','Mother ID', 'sex', 'Pheno'], engine='python')
+
+# Intersect the phenotype file and the 450K WES .fam file
+# to generate phenotype DataFrame for the 450K participants
+main_wes_450k_df = df_main_cohort_pandas.join(plink_fam_df.set_index('IID'), on='IID', rsuffix='_fam', how='inner')
+
+# Drop unuseful columns from .fam file
+main_wes_450k_df.drop(
+    columns=['FID_fam','Father ID','Mother ID','sex_fam', 'Pheno'], axis=1, inplace=True, errors='ignore'
+)
+
+print(type(main_wes_450k_df))
+
+pheno_IDs = main_wes_450k_df[["IID", "FID"]]
+
+print(pheno_IDs)
+
+pheno_IDs_main = df_main_cohort_pandas[["IID", "FID"]]
+print(pheno_IDs_main)
+
+# Write phenotype files to a TSV file
+main_wes_450k_df.to_csv('main_wes_450k.phe', sep='\t', na_rep='NA', index=False, quoting=3)
+main_wes_450k_df.to_csv('main_wes_450k.csv', sep='\t', na_rep='NA', index=False, quoting=3, escapechar='\\')
+df_main_cohort_pandas.to_csv('main_cohort.csv', sep='\t', na_rep='NA', index=False, quoting=3, escapechar='\\')
+pheno_IDs.to_csv('pheno_id_450k.phe', sep='\t', na_rep='NA', index=False, quoting=3)
+pheno_IDs.to_csv('pheno_id_450k.csv', sep='\t', na_rep='NA', index=False, quoting=3, escapechar='\\')
+
+# Write phenotype files to a TSV file (for the main (full) cohort)
+df_main_cohort_pandas.to_csv('main_cohort.csv', sep='\t', na_rep='NA', index=False, quoting=3, escapechar='\\')
+pheno_IDs_main.to_csv('pheno_id_main.csv', sep='\t', na_rep='NA', index=False, quoting=3, escapechar='\\')
+
+%%bash -s "$output_dir"
+dx upload main_wes_450k.phe -p --path $1 --brief
+
+%%bash -s "$output_dir"
+dx upload pheno_id_450k.phe -p --path $1 --brief
+
+%%bash -s "$output_dir"
+dx upload main_wes_450k.csv -p --path $1 --brief
+
+%%bash -s "$output_dir"
+dx upload pheno_id_450k.csv -p --path $1 --brief
+
+%%bash -s "$output_dir"
+dx upload main_cohort.csv -p --path $1 --brief
+
+%%bash -s "$output_dir"
+dx upload pheno_id_main.csv -p --path $1 --brief
+
+\end{lstlisting}
+\color{black}
+\subsubsection{Renaming variables}
+The important phenotype variables were selected and stored in the \textbf{main\_cohort.csv} dataset. The next step involved downloading the CSV file to the local machine. The downloaded data were saved to the \texttt{stata\_sbp\_input} file path. Once this was completed, the next step was to prepare the data for analysis. For participants prescribed antihypertensive medications, 15 mmHg and 10 mmHg were added to their baseline systolic blood pressure (SBP) and diastolic blood pressure (DBP) measurements, respectively\cite{tobin2005adjusting}. 
+\color{violet} 
+\begin{stlog}\input{log/1.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{Exclusion criteria}
+The revised phenotype variables were stored in the \textcolor{violet}{Phenotype\_data} dataset. The subsequent step involved excluding participants based on a set of criteria. These exclusion criteria included:
+\begin{itemize}
+    \item Sex mismatch between genetic sex and reported sex
+    \item Sex chromosome aneuploidy
+    \item Outliers for heterozygosity or missing rate
+    \item Ethnicity: non-White British participants
+    \item Participants without SBP values
+    \item Related participants (based on kinship)
+\end{itemize}
+\color{violet}
+\begin{stlog}\input{log/2.log.tex}\end{stlog}
+\color{black}
+
+The dataset labeled \textbf{part\_1.dta} contained the variables after applying the exclusion criteria. A separate dataset containing only the date of attending the assessment centre was stored in \textbf{date\_attending.dta}.
+
+\subsubsection{Hospital admission data}
+
+The \textbf{hesin\_diag} dataset was downloaded from the UKB RAP using the following Python code.
+\color{violet}
+\begin{lstlisting}[style=PythonStyle]
+
+#Building cohorts using Spark JupyterLab
+#Import important variables
+
+import os
+
+# Set environment variable before importing pyspark
+
+os.environ['PYARROW_IGNORE_TIMEZONE'] = '1'
+
+# Import necessary libraries
+import pyspark
+from pyspark import SparkConf, SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+import dxpy
+import dxdata
+import pandas as pd
+import re
+
+# Initialize SparkConf with the necessary configurations
+conf = SparkConf() \
+    .setAppName("HESIN Data Analysis") \
+    .set("spark.kryoserializer.buffer.max", "1g")
+
+# Initialize Spark
+# Spark initialization (Done only once; do not rerun this cell unless you select Kernel -> Restart kernel).
+
+sc = pyspark.SparkContext()
+spark = pyspark.sql.SparkSession(sc)
+
+
+print(f"Kryo serializer buffer max size set to: {conf.get('spark.kryoserializer.buffer.max')}")
+
+
+# Automatically discover dispensed dataset ID and load the dataset
+dispensed_dataset = dxpy.find_one_data_object(
+    typename="Dataset", 
+    name="app*.dataset", 
+    folder="/", 
+    name_mode="glob")
+dispensed_dataset_id = dispensed_dataset["id"]
+dataset = dxdata.load_dataset(id=dispensed_dataset_id)
+
+dataset.entities
+
+participant = dataset['hesin_diag']
+
+print(type(participant))
+
+help(participant)
+
+field_names = ['eid', 'ins_index', 'arr_index', 'level', 'diag_icd9', 'diag_icd9_nb', 'diag_icd10', 'diag_icd10_nb']
+
+df_hesin_diag = participant.retrieve_fields(names=field_names, engine=dxdata.connect())
+
+print("Initial columns:", df_hesin_diag.columns)
+
+print(type(df_hesin_diag))
+
+df_hesin_diag.show(5)
+
+df_hesin_diag.count()
+
+df_hesin_diag = df_hesin_diag.repartition(10)
+
+df_hesin_diag_main=df_hesin_diag.toPandas()
+
+print(type(df_hesin_diag_main))
+
+print(df_hesin_diag_main)
+
+df_hesin_diag_main.to_csv('hesin_diag_main.csv', index=False)
+
+%%bash
+dx upload hesin_diag_main.csv --dest project-Gkz56gjJx5g1zB269F0ybP63:/Data/
+\end{lstlisting}
+\color{black}
+The \textbf{hesin\_main} dataset, which included the date of diagnosis for participants admitted to hospitals, was also downloaded. The following Python code was used to create the necessary file from the UKB RAP.
+\color{violet} 
+\begin{lstlisting}[style=PythonStyle]
+#Building cohorts using Spark JupyterLab
+#Import important variables
+
+import os
+
+# Set environment variable before importing pyspark
+
+os.environ['PYARROW_IGNORE_TIMEZONE'] = '1'
+
+# Import necessary libraries
+import pyspark
+from pyspark import SparkConf, SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+import dxpy
+import dxdata
+import pandas as pd
+import re
+
+# Initialize SparkConf with the necessary configurations
+conf = SparkConf() \
+    .setAppName("HESIN Data Analysis") \
+    .set("spark.kryoserializer.buffer.max", "1g")
+
+# Initialize Spark
+# Spark initialization (Done only once; do not rerun this cell unless you select Kernel -> Restart kernel).
+
+sc = pyspark.SparkContext()
+spark = pyspark.sql.SparkSession(sc)
+
+
+print(f"Kryo serializer buffer max size set to: {conf.get('spark.kryoserializer.buffer.max')}")
+
+
+# Automatically discover dispensed dataset ID and load the dataset
+dispensed_dataset = dxpy.find_one_data_object(
+    typename="Dataset", 
+    name="app*.dataset", 
+    folder="/", 
+    name_mode="glob")
+dispensed_dataset_id = dispensed_dataset["id"]
+dataset = dxdata.load_dataset(id=dispensed_dataset_id)
+
+
+dataset.entities
+
+participant = dataset['hesin']
+
+print(type(participant))
+
+help(participant)
+
+field_names = ['eid', 'ins_index', 'dsource', 'epistart', 'epiend', 'epidur', 'admidate', 'disdate']
+
+
+df_hesin = participant.retrieve_fields(names=field_names, engine=dxdata.connect())
+
+print("Initial columns:", df_hesin.columns)
+
+
+print(type(df_hesin))
+
+
+df_hesin.show(5)
+
+df_hesin.count()
+
+df_hesin = df_hesin.repartition(10)
+
+df_hesin_main=df_hesin.toPandas()
+
+print(type(df_hesin_main))
+
+print(df_hesin_main)
+
+df_hesin_main.to_csv('hesin_main.csv', index=False)
+
+%%bash
+dx upload hesin_main.csv --dest project-Gkz56gjJx5g1zB269F0ybP63:/Data/
+\end{lstlisting}
+\color{black}
+Save the \textbf{hesin\_diag\_main.csv} and \textbf{hesin\_main.csv} files to the \textbf{hesin\_data} file path on the local machine.
+
+The next step involved working with the ICD codes. The \textbf{hesin\_diag\_main.csv} file contained both ICD-9 and ICD-10 diagnosis codes. The analysis first focused on the ICD-10 codes before proceeding to the ICD-9 codes. In addition to diagnosis codes, the dataset also included variables labeled \textbf{instance} (\texttt{ins\_index}), \textbf{array} (\texttt{arr\_index}), and \textbf{level}.
+
+ 
+\textbf{Instance} indicates how many occasions participants have measurements performed. There are three categories: 
+\begin{itemize}
+\item \textbf{Singular}: only one instance can be present, for example sex or year-of-birth
+\item \textbf{Defined}: more than one instance may be present, and each instance represents a fixed identifiable set of results across all participants
+\item \textbf{Variable}: more than one instance may be present, however there is no correspondence between (say) the 3rd instance for one participant and the 3rd instance for another 
+\end{itemize}
+\textbf{Array} describes whether there are multiple data items for a given participant instance. There are two categories:
+\begin{itemize}
+\item \textbf{Single}:  only one data item is present for each participant, for instance the answer to "What is your favourite colour of the rainbow?" 
+\item \textbf{Multiple}: more than one data item may be present for each participant, for instance the answer to "Which colours of the rainbow do you like?"
+\end{itemize}
+\textbf{level} describes whether the diagnosis is primary (1) or secondary (2) \\
+
+\subsubsubsection{Working on ICD-10 diagnosis codes}
+
+The next line of stata codes will do the followng tasks:
+\begin{itemize}
+\item filter ICD-10 codes
+\item merge with the \textbf{hesin\_main.dta} dataset (we need to convert the csv file to dta for convenience)
+\item identify admission or episode start date 
+\item identify discharge or episode end date (if required)
+\item merge with \textbf{data\_attending.dta} file which contains participants' date of attending the UK Biobank assessment centre
+\item create 240 dummy variables for the conditions we would like to work on the next step. 
+\end{itemize}
+\color{violet}
+\begin{stlog}\input{log/3.log.tex}\end{stlog}
+\color{black}
+The \textbf{hesin\_icd10\_dates.dta} dataset was large, and processing it in full required several hours to complete the analysis. To improve efficiency, the dataset was divided into smaller subsets with reduced sample sizes. Within each subset, the date of diagnosis was identified for 240 predefined comorbidities.
+
+\color{violet}
+\begin{stlog}\input{log/4.log.tex}\end{stlog}
+\color{black}
+The necessary \textbf{date\_episodes} were identified for each of the 240 comorbidities and saved as \textbf{hesin\_icd10\_complete.dta}.
+\subsubsubsection{Working on ICD-9 diagnosis codes}
+
+Next, we followed the same approach to work on the ICD-9 codes as we did for the ICD-10 codes. 
+\color{violet}
+\begin{stlog}\input{log/5.log.tex}\end{stlog}
+\color{black}
+The necessary \textbf{date\_episodes} were added to the relevant ICD-9 codes for the 240 comorbidities and saved as \textbf{hesin\_icd9\_complete.dta}.
+
+Finally, \textbf{hesin\_icd10\_complete.dta} and \textbf{hesin\_icd9\_complete.dta} datasets were merged into \textbf{hesin\_icd\_complete.dta}.
+\color{violet}
+\begin{stlog}\input{log/6.log.tex}\end{stlog}
+\color{black}
+\subsubsection{Setting up the data for HRQoL prediction}
+
+We compiled the phenotype data, including both ICD-9 and ICD-10 diagnosis dates. The next step was to prepare the data for HRQoL prediction based on the types of comorbidities that a participant might have developed.
+
+The next stata codes will execute: 
+
+\begin{itemize}
+\item{Merge the \textbf{part\_1.dta} dataset with \textbf{hesin\_icd\_compelet.dta} dataset}
+\item{Generate variables labeled "z" to make sure if a study participant have developed a condition before the utility day.}
+\item{Generate variables labeled "ncc" to count the number of comorbidities a particiapant may have}
+\item{Rename some variables}
+\item{Reclassify the "qualification" variable for the purpose of analysis}
+\end{itemize}
+\color{violet}
+\begin{stlog}\input{log/7.log.tex}\end{stlog}
+\color{black}
+\textbf{Dividing the part\_2a.dta Dataset into Small Blocks}
+
+The \textbf{part\_2a.dta} dataset was large, making utility prediction slow. To expedite the analysis, the following steps were taken:
+
+First, the data were divided into 12 blocks, each containing 25,000 observations. Then, the utility was predicted for each block.
+
+\subsubsubsection{Predicting Utility}
+
+The initial plan was to predict the daily utilities for the participants. However, running the \textit{for loop} for daily predictions would have taken a significant amount of time. Therefore, a monthly utility prediction was chosen by converting the dates into month values. The following steps were taken for the prediction:
+
+\begin{itemize}
+\item{Step 1: Changed variables with date values to monthly values.}
+\item{Step 2: Determined the length of the follow-up window for total QALYs (denoted as \texttt{fu}).}
+\item{Step 3: Created a \textit{for loop} to predict utility using coefficients sourced from Sullivan et al.\cite{sullivan2011catalogue} for the covariates adjusted for prediction and comorbidities.}
+\item{Step 4: Predicted the utilities for the participants, considering:}
+	\begin{itemize}
+		\item{The 240 conditions - the main prediction model}
+		\item{The four major conditions: cancer, cardiovascular disease, cerebrovascular disease, and diabetes}
+	\end{itemize}
+\end{itemize}
+
+\textbf{N.B.} Since the Stata code was long and somewhat complicated, comments were added throughout to improve the interpretability of the code.
+
+\textbf{N.B.} Since the Stata command used a \textit{local macro}, the entire command was run at once.
+ 
+\color{violet} 
+\begin{stlog}\input{log/8.log.tex}\end{stlog}
+\color{black}
+The QALYs were predicted over an average follow-up period and the data were saved into \textbf{part\_3a\_753\_x.dta} for England and Scotland, where \textbf{x} represents the data block (ranging from 1 to 12). Next, the analysis was focused on the Wales data.
+\color{violet}
+\begin{stlog}\input{log/9.log.tex}\end{stlog}
+\color{black}
+The QALYs were also predicted over an average follow-up period and the data were saved into \textbf{part\_3a\_748\_x.dta} for Wales, where \textbf{x} represents the data block (ranging from 1 to 12). Next, we merged these two datasets.
+\color{violet}
+\begin{stlog}\input{log/10.log.tex}\end{stlog}
+\color{black}
+\subsubsection{Working on EQ-5D data collected by UK Biobank}
+
+Web based \textbf{EQ-5D-5L} questionnaires were administered to the UK Biobank participants as part of the chronic pain (administered in 2019--20) and mental well-being (administered in 2022--23) surveys. We calculated the \textbf{EQ-5D index} using the \textbf{UK tariffs} (i.e., value set) for each survey\cite{devlin2018valuing}. Once the EQ-5D-indexes were calculated, we took the average EQ-5D-index for participants who had EQ-5D data for both surveys (124,830). The remaining participants had EQ-5D data for either chronic pain survey (42,281) or mental well-being survey (44,707); hence, the average EQ-5D index was not calculated. The next line of codes will prepare our data for EQ-5D index calculation, then apply the UK tariffs.
+\color{violet} 
+\begin{stlog}\input{log/11.log.tex}\end{stlog}
+\color{black}
+We have now completed the first step. We will work on the \textbf{genotype data}.
+\newpage
+
+\subsection{Step 2: Working on genotype data}
+\subsubsection{Preparing our data} 
+To run a mendelian randomisation (MR) analysis, a type of instrumental variable analysis, to estimate the causal association of SBP (i.e., exposure) with QALYs (i.e., outcome) using genetic variants as instruments, we need genetic variants that are strongly associated with the exposure (i.e., trait) of interest. In this case, we need genetic variants (also known as single nucleotide polymorphisms) that are associated with SBP. There are a number of assumptions genetic variants should meet to run an MR analysis\cite{lawlor2008mendelian, burgess2015mendelian, davies2018reading}.
+ 
+\begin{itemize}
+\item{\textbf{relevance}: the variant is associated with the exposure}
+\item{\textbf{exchangeability}: the variant is not associated with the outcome via a confounding pathway }
+\item{\textbf{exclusion restriction}: the variant does not affect the outcome directly, only possibly indirectly via exposure}
+\end{itemize}
+ 
+For this we look into a study conducted by Evangelou E. et al\cite{evangelou2018genetic}. This genome-wide association study (GWAS) included data from the UK Biobank, International Consortium for Blood Pressure (ICBP), the US Million Veteran Program (MVP) and Estonian Genome Centre, University of Tartu (EGCUT). The UK Biobank and ICBP data were used for discovery meta-analysis, while the MVP and EGCUT data were used for replication meta-analysis. A combined meta-analysis was also performed using all data sources\cite{evangelou2018genetic}. The GWAS study has identified 535 novel loci (1 variant per locus) that have reached the significant threshold to one of the blood pressure traits\cite{evangelou2018genetic}. The criteria for significance threshold for genetic variants with a specific trait was based on one-stage or two-stage analysis design set by the GWAS study\cite{evangelou2018genetic}. SNPs were filtered to meet criteria of genotype missingness below 0.015 and minor allele frequency above 0.01\cite{evangelou2018genetic}. They were also tested for Hardy-Weinberg equilibrium and linkage disequilibrium within the GWAS\cite{evangelou2018genetic}. Linkage disequilibrium (LD) was calculated for all variants within a 500kb window on either side of the reference SNP\cite{evangelou2018genetic}. Variants in linkage disequilibrium with the reference SNP, reaching an \( r^{2} \) threshold of 0.1 or higher, were identified\cite{evangelou2018genetic}.
+
+The GWAS study also included 92 sentinel SNPs previously known but replicated for the first time and 357 SNPs already known and validated to have association with one of the blood pressure traits.  
+
+Among the 984 SNPs, 282 were primarily related to SBP\cite{evangelou2018genetic}. After LD clumping (\( r^{2} \)  0.001 and 10,000 kb window) and removing ambiguous SNPs, 181 genetic instruments were candidates for building polygenic risk scores (PRS).  If a sentinel SNP was not available in the UK Biobank, a proxy SNP was substituted  (\( r^2 \geq 0.8 \))\cite{evangelou2018genetic}.  PRS was constructed by summing the effects of the 181 SNPs on SBP, each weighted by its effect size derived from non-UK Biobank cohorts (the ICBP meta-analysis and replication meta-analysis). The ICBP and replication meta-analyses were selected to avoid cohort overlap with the UK Biobank population.
+
+We also need diastolic blood pressure for the multivariable MR (MVMR)analysis, an extention of standard MR analysis. The GWAS study reported sentinel SNPs association with primary and secondary blood pressure traits\cite{evangelou2018genetic}. For the 187 sentinel SNPs primarily associated with SBP (after LD clumping), we also identified association with DBP as a secondary trait. Similarly, we also identified 208 sentinel SNPs (after LD clumping) primarily associated with DBP that were also linked to SBP. The combined 395 SNPs were candidates for the MVMR analysis. After the exclusion of ambiguous and missing effect size SNPs, 384 and 382 SNPs were used to construct PRS for SBP and DBP, respectively. Effect estimates for the SNPs were sourced from either ICBP or replication meta-analysis.
+
+\subsubsection{Association of Genetic Variants with blood pressure traits}
+
+The following stata code will help us to format the data suitable for the next analysis. 
+\color{violet}
+\begin{stlog}\input{log/12.log.tex}\end{stlog}
+\color{black}
+\subsubsection{LD Clumping}
+
+The previous Stata codes provided CSV files for the next step: LD clumping using the \textbf{TwoSampleMR} and \textbf{ieugwas} packages from R. First, an Application Programming Interface (API) was set up to access the \textbf{IEU GWAS} database. Then, the SNPs were clumped.
+\color{violet}
+\begin{lstlisting}[style=Rstyle]
+#This is to set up the API 
+# Get the location of your .Renviron file
+renviron_path <- Sys.getenv("R_ENVIRON_USER")
+
+# If the .Renviron file doesn't exist, create it
+if (renviron_path == "") {
+  renviron_path <- file.path(Sys.getenv("HOME"), ".Renviron")
+  file.create(renviron_path)
+}
+
+# Append your token to the .Renviron file
+cat("OPENGWAS_JWT=<Add Your Token Here>", file = renviron_path, append = TRUE)
+
+# Print the path to verify
+print(renviron_path)
+
+
+library(ieugwasr)
+
+# Check if the token is loaded
+jwt <- ieugwasr::get_opengwas_jwt()
+if (nzchar(jwt)) {
+  cat("Token is recognized:\n", jwt, "\n")
+} else {
+  cat("Token is not recognized. Check your .Renviron file.\n")
+}
+
+
+# Retrieve user information
+user_info <- ieugwasr::user()
+
+# Check if user information is retrieved
+if (!is.null(user_info)) {
+  print("Token is working. User information:")
+  print(user_info)
+} else {
+  print("Token is not working. Check your token and internet connection.")
+}
+
+#################################################################
+
+#Load the necessary packages
+
+library(MRPracticals)
+library(TwoSampleMR)
+library(ieugwasr)
+library(MRInstruments)
+library(dplyr)
+library(readxl)
+
+vignette("MRBase")
+
+################################################################
+
+#Run the analysis from here onwards 
+setwd("C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/sbp_snps")
+getwd()
+
+
+
+sbp_data<-read.csv("all_sbp_snps.csv")
+sbp_data[c("Chromosome", "Position")]<-do.call(rbind,strsplit(sbp_data$chrpos, ":"))
+sbp_data$Chromosome<-as.numeric(sbp_data$Chromosome)
+sbp_data$Position<-as.numeric(sbp_data$Position)
+
+
+sbp_data_2<-sbp_data%>%select(Chromosome, Position, rsID, Beta_SBP, se_SBP, A1, A2, EAF_SBP, P_min, Trait, Beta_DBP, se_DBP, EAF_DBP)%>%mutate(id.exposure = "icbp_rep")
+colnames(sbp_data_2)
+
+colnames(sbp_data_2)<-c("chr.exposure", "pos.exposure", "SNP", "beta.exposure", "se.exposure","effect_allele.exposure", "other_allele.exposure", "eaf.exposure", "pval.exposure", "exposure", "Beta_DBP", "se_DBP", "EAF_DBP", "id.exposure")
+head(sbp_data_2)
+
+sbp_data_2<-sbp_data_2[order(sbp_data_2$chr.exposure),]
+
+clumped_sbp_data_2 <- clump_data(sbp_data_2, 
+                               clump_kb = 10000,  # Clumping window (10,000 kb)
+                               clump_r2 = 0.001,  # LD threshold (r2 < 0.001)
+                               pop = "EUR")  # European LD reference
+
+sbp_snplist<-clumped_sbp_data_2%>%select(SNP)
+
+#sbp_effect_list<-clumped_sbp_data_2%>%select(SNP,effect_allele.exposure,beta.exposure)
+
+
+
+write.csv(clumped_sbp_data_2, "sbp_exposure.csv", row.names = FALSE)
+write.table(sbp_snplist, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp/data/sbp_snplist.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+
+\end{lstlisting}
+\color{black}
+We have clumped the SNPs, and the necessary genetic variants primarily associated with SBP were selected, totaling 187 SNPs. The \textbf{snp\_snplist.txt} file was then used to select the required genetic variants from the UK Biobank imputed BGEN file.
+
+\subsubsection{Selecting the genetic variants from the BGEN file}
+
+\textbf{PLINK2} was used via the \textbf{Swiss Army Knife} to select the necessary SNPs from the UK Biobank. The UKB RAP served as the platform to access the SNPs from the UK Biobank. Alternatively, a \textit{bash} command was used on the local machine to run the process. First, log in with your UKB RAP credentials using the Command Prompt (on a Windows machine). Then, open Git Bash, select your project, and run the analysis. A job request was sent, and users were notified when the process was complete.
+
+\begin{lstlisting}[style=BashStyle]
+#########################################################################
+#Run the following PLINK2 codes on Git Bash 
+#########################################################################
+
+#Login through Command Prompt on your Windows machine 
+dx login
+
+#Run the code below on Git Bash
+ 
+dx select --level VIEW 
+#select your project
+# make sure your sbp_snplist.txt file is uploaded to the UKB RAP. 
+#select the "instance type" you want: this makes sure you have enough computation power (CPU and GPU). 
+#In the command below, I put chromosome 1 to 22 to loop through all autosomal chromosomes just to show the code. But in actuality, I put two chromosomes at a time. This makes sure I have enough computational space and if there is any error, I could adjust the code. 
+
+# Loop over chromosomes 1 to 22 and process each one with the SNP list
+run_merge=""
+for chr in {1..22}; do
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.bgen .; "
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.sample .; "
+    run_merge+="plink2 --bgen ukb22828_c${chr}_b0_v3.bgen ref-first --sample ukb22828_c${chr}_b0_v3.sample --extract sbp_snplist.txt --make-pgen --autosome-xy --out ukb22828_c${chr}_v3; "
+done
+
+dx run swiss-army-knife -iin="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_data/sbp_txt/sbp_snplist.txt" -icmd="${run_merge}" --tag="Step1" --instance-type "mem1_ssd1_v2_x36" --destination="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_data/sbp_geno_data/" --brief --yes
+
+#########################################################################
+#Run the following PLINK2 codes via Swiss Army Knife on UKB RAP platform 
+#########################################################################
+#Make sure you have uploaded the sbp_merge_list.txt to UKB RAP file path. 
+#The merge list should have a sigle column list containing the following text, "ukb22828_cx_v3" (without the quotations). The column wil have 22 rows for each autosomal chromosomes. Replace "x" with 1-22. 
+
+#merging the pgen files
+
+#Execute the command on Swiss Army Knife interface 
+#inputs are the plink files for the chromosomes and the txt file for the merging chromosomes 
+plink2 --pmerge-list sbp_merge_list.txt pfile --make-pgen --out ukb22828_c1_22_v3_sbp_merged
+
+#Calculate the allele dosage 
+#creating a .raw file for participants with the number of effect allele (0, 1, or 2) for each snp
+# Input the for code below is the merged plink files (pfiles)
+
+plink2 --pfile ukb22828_c1_22_v3_sbp_merged --export A --out ukb22828_sbp_alleles
+
+#Calculate allele frequency 
+
+plink2 --pfile ukb22828_c1_22_v3_sbp_merged --freq --out ukb22828_sbp_allele_freq
+
+\end{lstlisting}
+
+\color{black}
+The final PLINK output files, \textbf{ukb22828\_sbp\_alleles.raw} and \textbf{ukb22828\_sbp\_allele\_freq.afreq}, contained the allele dosage and allele frequency for each of the 187 SNPs. These files were downloaded to the local machine and saved to the \texttt{\$dx\_data\_sbp} file path.
+
+\subsubsection{Association of Genetic Variants with Quality-Adjusted Life Years}
+
+We then worked on the association between the genetic variants and QALYs. The QALYs were regressed on the allele dosages, adjusting for age, sex, and the first 10 genetic principal components to account for population stratification.
+\color{violet}
+\begin{stlog}\input{log/13.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{Data harmonisation}
+
+We now had the SNP-exposure and SNP-outcome association data. The next task was to harmonize these two datasets. For this, we continued working in the previous R environment. Data harmonization ensured that the effect alleles between the two datasets were properly aligned and removed any ambiguous SNPs. Ambiguous SNPs were those with A/T or C/G allele pairs, as they could create strand alignment issues due to their complementarity, making it difficult to determine the correct effect direction.
+\begin{lstlisting}[style=Rstyle]
+# we will continue working in R environment
+# clumped_dbp_data_2 contains the SNP-SBP association 
+
+# Upload the SNP-outcome csv file: snp_qaly_hes.csv
+qaly_hes_data<-read.csv("C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/sbp_snps/snp_qaly_hes.csv")
+
+# rename the column names
+colnames(qaly_hes_data)<-c("SNP", "other_allele.outcome", "effect_allele.outcome", "eaf.outcome", "outcome", "beta.outcome", "se.outcome", "variance.outcome", "pval.outcome", "samplesize.outcome")
+
+#add outcome ID
+qaly_hes_data$id.outcome = "ukb" # "ukb" added here just a reminder the SNP-outcome association is from UKB cohort. 
+
+#Harmonise the data 
+harmonise_data <- harmonise_data(
+  exposure_dat = clumped_sbp_data_2, 
+  outcome_dat = qaly_hes_data
+)
+
+#save the file 
+write.csv(harmonise_data, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/sbp_snps/snp_sbp_qaly_hes_harmonised.csv", row.names = FALSE)
+
+#select the SNP-exposure associatoin column for the next analysis 
+sbp_effect_list<-harmonise_data%>%select(SNP,effect_allele.exposure,beta.exposure)
+
+#Filter ambiguous to exclude for the next analysis 
+sbp_snplist_exclude<-harmonise_data%>%filter(mr_keep == "FALSE")%>%select(SNP)
+
+#save both files in a .txt format 
+write.table(sbp_effect_list, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp/data/sbp_effect_list.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.table(sbp_snplist_exclude, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp/data/sbp_snplist_exclude.txt", row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+
+\end{lstlisting}
+\color{black}
+
+We have harmonised our data and created .txt files for the next analysis. 
+
+\subsubsection{Calculating polygenic risk scores}
+
+Using the \textbf{sbp\_effect\_list.txt} file and excluding ambiguous SNPs based on the \textbf{sbp\_snplist\_exclude.txt} file, the \textbf{polygenic risk score (PRS)} was calculated. PRS is a weighted sum of risk alleles across many genetic variants (SNPs). In our study, it was calculated across 181 SNPs after excluding the ambiguous ones.
+
+The two .txt files were uploaded to the UKB RAP platform, and PLINK2 was used via the Swiss Army Knife to calculate the PRS.
+\begin{lstlisting}[style=BashStyle]
+# Upload sbp_effect_list.txt and sbp_snplist_exclude.txt files to UKB RAP
+# We will also use the merged plink files we created before 
+# Use the two .txt files and the merged plink flies to run the following code to calculate the PRS via Swiss Army Knife 
+
+plink2 --pfile ukb22828_c1_22_v3_sbp_merged --score sbp_effect_list.txt cols=+scoresums --exclude sbp_snplist_exclude.txt --out ukb22828_sbp_prs
+
+\end{lstlisting}
+We have now calculated the PRS for SNPs effect on SBP. Download the \textbf{ukb22828\_sbp\_prs.sscore} file to your local machine and save them to the \texttt{\$dx\_data\_sbp} file path.
+\newpage
+\subsection{Step 3: Combining Phenotype and Genotype data}
+
+Now we will combine our phenotype data with PRS. The \textbf{part\_3b.dta} contains the phenotype data for our cohor while the \textbf{ukb22828\_sbp\_prs.sscore} contains the PRS for each participants in the UK Biobank. The next stata line of codes will merge the two datasets. In addition prepare our data for the main and sensitivity analyses. 
+\color{violet}
+\begin{stlog}\input{log/14.log.tex}\end{stlog}
+\color{black}
+We have prepared our dataset for the main and sensitivity analyses. 
+\newpage
+\subsection{Step 4: Main analysis}
+
+We estimated the causal association of SBP with QALY using \textbf{MR technique}\cite{davey2003mendelian, burgess2015mendelian, lawlor2008mendelian}. Specifically, \textbf{two-stage least square (2SLS)} run by regressing the exposure variable (SBP) on the PRS for SBP at the first stage followed by regressing the outcome variable (QALYs) on the predicted SBP from the first stage. Age, sex, UK Biobank assessment centre, genotyping array, and the first 10 genetic principal components for population stratification were used as covariates in the model. F-statistics was used to assess for weak instrument bias. Outputs of the model interpreted as change in QALYs caused by a 1 mmHg increase in SBP over an average year of follow-up. For convenience, the final output was presented as percentage change in QALY per 10 mmHg increase in SBP.
+
+We also performed \textbf{multivariable linear regression model} fitting the QALY outcome on SBP exposure data adjusting for age, sex, assessment centre, genotyping array and the first 10 genetic principal components. Then compared the estimate from 2SLS with the multivariable linear regression model and test for presence of \textbf{endogeneity (Hausman test)}\cite{durbin1954errors, wu1973alternative, hausman1978specification}. A low p value in the Hausman test indicated difference in the estimates between the 2SLS and multivariable linear regression model. 
+\color{violet}
+\begin{stlog}\input{log/15.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsection{Step 5: Sensitivity analyses}
+
+To test the robustness of the main analyses outcome, a number of sensitivity analyses were perfomed. 
+
+\begin{itemize}
+	\item \textbf{Untreated population}: Rerun the main analysis for the cohort without antihhpertensive medications 
+	\item \textbf{Two-sample MR}: Run a number of summary level MR analyses
+	\item \textbf {Sub-group analysis}: Stratified by age, sex, PRS-free SBP
+	\item \textbf{Non-linear MR}
+	\item \textbf{EQ-5D index from UK Biobank survey}
+\end{itemize}
+
+\subsubsection{Untreated populaton}
+We repeated the main analysis excluding participants prescribed with antihypertensive medications. 
+\color{violet}
+\begin{stlog}\input{log/16.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{Two-sample MR}
+
+To test the robustness of the main analysis estimate, 2SLS, we also performed a two-sample MR (i.e., summary level MR)\cite{burgess2015mendelian}. The first sample data was sourced from the ICBP and replication meta-analyses which included the effect of the 181 SNPs on SBP\cite{evangelou2018genetic}. For the second sample, we estimated the effect of the 181 SNPs on QALYs using the UK Biobank population by regressing the QALYs on the 181 SNPs allele dosage (the number of effect allele each participant has) adjusting for age, sex and the first 10 genetic principal components\cite{sudlow2015uk, bycroft2018uk}. Inverse variance weighting (IVW), MR Egger, weighted median and weighted mode analyses were performed using the summary level data\cite{burgess2015mendelian}. 
+
+\begin{itemize}
+	\item IVW
+		\begin{itemize}
+			\item IVW method combines the individual ratio estimates from multiple genetic instruments (i.e., SNPs) into a single overall estimate, using a weighted average approach, where the weights are the inverse of the variance of the SNP-outcome association\cite{burgess2015mendelian}. 
+			\item Presence of heterogeneity among the instruments was tested using Cochran's Q statistics, and a statistically significant p-value indicates evidence of heterogeneity\cite{cochran1954combination}. 
+			\item To quantify the degree of heterogeneity, \( I^2 \) was also reported, with 0\% indicating no observed heterogeneity, \( 0\% < I^2 \leq 25\% \) representing low heterogeneity, \( 25\% < I^2 \leq 50\% \) indicating moderate heterogeneity, \( 50\% < I^2 \leq 75\% \) denoting substantial heterogeneity, and \( I^2 > 75\% \) reflecting considerable heterogeneity\cite{cochran1954combination}.
+		\end{itemize}
+	\item MR Egger 
+		\begin{itemize}
+			\item The MR Egger method used to test for and account for directional pleiotropy, a potential source of bias in causal estimates\cite{burgess2015mendelian}. It's an extension of the IVW approach, with additional flexibility to model horizontal (i.e., directional) pleiotropy, which occurs when genetic variants (SNPs) influence the outcome through pathways other than the exposure of interest\cite{burgess2015mendelian}. The main difference between MR Egger and IVW is that MR Egger includes an intercept term in the regression model. This allows for testing and adjusting for directional pleiotropy\cite{burgess2015mendelian}. 
+		\end{itemize}
+	\item Weighted median
+		\begin{itemize}
+			\item The weighted median method is useful when some of the genetic variants (SNPs) used as instrumental variables may be invalid due to pleiotropy or other issues\cite{burgess2015mendelian}. This method gives consistent causal estimate if at least 50% of the weight in the analysis stems from variants that are valid instruments\cite{burgess2015mendelian}.
+		\end{itemize}
+	\item Weighted mode
+		\begin{itemize}
+			\item The weighted mode method estimates the causal effect by finding the most common (modal) value of SNP-specific causal estimates, with more weight given to SNPs that are more precise\cite{burgess2015mendelian}. This method is robust to invalid instruments and can produce valid estimates even when most instruments are invalid\cite{burgess2015mendelian}. 
+		\end{itemize}
+\end{itemize}
+\color{violet}
+\begin{stlog}\input{log/17.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{Sub-group analysis}
+
+\textbf{Sub-group analysis} was performed by rerunning the main MR stratified by age categories ($<$ 50 years, 50-54 years, 55-59 years, 60-64 years, and 65+ years), sex (Male and Female), and PRS-free SBP categories ($<$120 mmHg, 120-139 mmHg and 140+ mmHg). PRS-free SBP was estimated by first regressing observed SBP (i.e., mean SBP) on the PRS for SBP and then predicting each participant's SBP as if they had the average PRS for SBP\cite{harrison2021long}. 
+\color{violet}
+\begin{stlog}\input{log/18.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{Non-linear MR}
+
+\textbf{Non-linear MR} was performed by running the main MR within fifty quantiles of PRS-free SBP, estimating quantile specific \textbf{local average causal effects}. These local average estimates were used in the \textbf{variance weighted least squares (VWLS)} models to determine whether there was a stable or incremental change in the effect of SBP on QALYs as SBP increased. Both linear and cubic models (with respect to the mean PRS-free SBP in each quantile) used to describe the shape of the effect of the increase in SBP over the range of PRS-free SBP values. We followed the next steps to execute the non-linear MR analysis. 
+ 
+\subsubsubsection{Rerun the main MR within the fifty quantiles of PRS-free SBP}
+\color{violet}
+\begin{stlog}\input{log/19.log.tex}\end{stlog}
+\color{black}
+\subsubsubsection{Sub-group analysis mainly stratified by PRS-free SBP}
+
+For each PRS-free SBP category, we further stratified by age-group and sex. 
+\color{violet}
+\begin{stlog}\input{log/20.log.tex}\end{stlog}
+\color{black}
+\subsubsubsection{Select observations for all participants in each SBP}
+\color{violet}
+\begin{stlog}\input{log/21.log.tex}\end{stlog}
+\color{black}
+\subsubsubsection{Estimate the mean SBP for each quantile}
+\color{violet}
+\begin{stlog}\input{log/22.log.tex}\end{stlog}
+\color{black}
+\subsubsubsection{Merge the previous datasets for VWLS analyses and plots}
+
+We run the analyses here
+\color{violet}
+\begin{stlog}\input{log/23.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{EQ-5D index from UK Biobank survey}
+
+We performed an additional sensitivity analysis using the EQ-5D-5L survey data from the UK Biobank\cite{ukb2022pain, ukb2023mental} to assess whether the direction of the effect observed in the main analysis would be similar when using direct EQ-5D-5L data from UK Biobank. Web-based EQ-5D-5L questionnaires were administered to the UK Biobank participants as part of the chronic pain (administered in 2019--20) and mental well-being (administered in 2022--23) surveys\cite{ukb2022pain, ukb2023mental}. There were 167,111 participants responded to the chronic pain survey\cite{ukb2022pain} and 169,537 participants responded to the mental well-being survey\cite{ukb2023mental}. We calculated the EQ-5D index using the UK tariffs (i.e., value set) for each survey\cite{devlin2018valuing}. Once the EQ-5D-indexes were calculated, we took the average of both EQ-5D-indexes for participants who had EQ-5D data for both surveys (124,830). The remaining participants had EQ-5D data for either chronic pain survey (42,281) or mental well-being survey (44,707); hence, the average EQ-5D index was not calculated. In total, there were 211,818 participants with EQ-5D index data from the combined survey. Of these participants, 128,635 had met the initial inclusion criteria and were included in this sensitivity analysis. 
+ 
+We rerun 2SLS analysis by regressing the SBP trait on the genetic risk scores for SBP on the first stage following by fitting the EQ-5D index on the predicted SBP values from the first stage. We adjusted for age, sex, UK Biobank assessment centre, genotyping array, and the first 10 genetic principal components for population stratification. Outputs from the 2SLS model were presented as the effect of 10 mmHg increase in SBP on percentage change in EQ-5D index. 
+\color{violet} 
+\begin{stlog}\input{log/24.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsection{Step 6: Secondary analysis}
+\subsubsection{Multivariable Mendelian Randomisation}
+
+We performed a multivariable MR(MVMR), an extension of a simple MR that accounts for multiple exposures that are potentially related and may influence the outcome of interest\cite{burgess2015multivariable, sanderson2019examination, sanderson2021multivariable}. For this analysis, SBP and DBP were considered as exposures. The mean DBP calculated the same way as the mean SBP described above (see exposure and covariate section). For participants who reported taking antihypertensive medications, a 10 mmHg add to the mean DBP measurement\cite{evangelou2018genetic, wan2021blood, tobin2005adjusting, warren2017genome}.
+
+The GWAS study reported sentinel SNPs association with primary and secondary traits\cite{evangelou2018genetic}. For the 187 sentinel SNPs primarily associated with SBP (after LD clumping), we also identified association with DBP as a secondary trait. Similarly, we also identified 208 sentinel SNPs (after LD clumping) primarily associated with DBP that were also linked to SBP. The combined 395 SNPs were candidates for the MVMR analysis. After the exclusion of ambiguous and missing effect size SNPs, 384 and 382 SNPs were used to construct PRS for SBP and DBP, respectively. Effect estimates for the SNPs were sourced from either ICBP or replication meta-analysis. 
+
+\subsubsubsection{Working on the DBP data} 
+
+We had already worked on known and validated SNPs, known but validated (i.e., replicated) for the first time, and novel SNPs associated with the DBP trait. We continued to work on these SNPs.
+
+These SNPs were clumped using the \textbf{TwoSampleMR} and \textbf{ieugwasr} packages in the \textbf{R environment}.
+\color{black}
+
+\subsubsubsection{Clumping SNPs in LD}
+
+The previous stata codes provided csv files for the next step, LD clumping using \textbf{TwoSampleMR} and \textbf{ieugwas} packages. First, we need to set up an Application Programming Interface (API) to access the \textbf{IEU GWAS} database. Then we clump the SNPs in LD.
+\color{violet}
+\begin{lstlisting}[style=Rstyle]
+# We will continue working on in the R environment. 
+# We clump the SNPs in LD. 
+
+dbp_data<-read.csv("C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dbp_snps/all_dbp_snps.csv")
+dbp_data[c("Chromosome", "Position")]<-do.call(rbind,strsplit(dbp_data$chrpos, ":"))
+dbp_data$Chromosome<-as.numeric(dbp_data$Chromosome)
+dbp_data$Position<-as.numeric(dbp_data$Position)
+
+dbp_data_2<-dbp_data%>%select(Chromosome, Position, rsID, Beta_DBP, se_DBP, A1, A2, EAF_DBP, P_min, Trait, Beta_SBP, se_SBP, EAF_SBP)%>%mutate(id.exposure = "icbp_rep")
+colnames(dbp_data_2)
+
+colnames(dbp_data_2)<-c("chr.exposure", "pos.exposure", "SNP", "beta.exposure", "se.exposure","effect_allele.exposure", "other_allele.exposure", "eaf.exposure", "pval.exposure", "exposure", "Beta_SBP", "se_SBP", "EAF_SBP", "id.exposure")
+head(dbp_data_2)
+
+dbp_data_2<-dbp_data_2[order(dbp_data_2$chr.exposure),]
+
+clumped_dbp_data_2 <- clump_data(dbp_data_2, 
+                                 clump_kb = 10000,  # Clumping window (10,000 kb)
+                                 clump_r2 = 0.001,  # LD threshold (r2 < 0.001)
+                                 pop = "EUR")  # European LD reference
+
+dbp_snplist<-clumped_dbp_data_2%>%select(SNP)
+#sbp_effect_list<-clumped_sbp_data_2%>%select(SNP,effect_allele.exposure,beta.exposure)
+
+
+
+write.csv(clumped_dbp_data_2, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dbp_snps/dbp_exposure.csv", row.names = FALSE)
+write.table(dbp_snplist, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/dbp/data/dbp_snplist.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+
+\end{lstlisting}
+\color{black}
+\subsubsubsection{Selecting the genetic variants from the BGEN file}
+
+\textbf{PLINK2} was used via the \textbf{Swiss Army Knife} to select the necessary SNPs from the UK Biobank. The UKB RAP served as the platform to access the SNPs from the UK Biobank. Alternatively, a \textit{bash} command was used on the local machine to run the process. First, users logged in with their UKB RAP credentials using the Command Prompt (on a Windows machine). Then, Git Bash was opened, the project was selected, and the analysis was run. A job request was sent, and users were notified when it was completed.
+\begin{lstlisting}[style=BashStyle]
+#########################################################################
+#Run the following PLINK2 codes on Git Bash 
+#########################################################################
+
+#Login through Command Prompt on your Windows machine 
+dx login
+
+#Run the code below on Git Bash
+ 
+dx select --level VIEW 
+#select your project
+# make sure your sbp_snplist.txt file is uploaded to the UKB RAP. 
+#select the "instance type" you want: this makes sure you have enough computation power (CPU and GPU). 
+#In the command below, I put chromosome 1 to 22 to loop through all autosomal chromosomes just to show the code. But in actuality, I put two chromosomes at a time. This makes sure I have enough computational space and if there is any error, I could adjust the code. 
+
+# Loop over chromosomes 1 to 22 and process each one with the SNP list
+run_merge=""
+for chr in {1..22}; do
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.bgen .; "
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.sample .; "
+    run_merge+="plink2 --bgen ukb22828_c${chr}_b0_v3.bgen ref-first --sample ukb22828_c${chr}_b0_v3.sample --extract dbp_snplist.txt --make-pgen --autosome-xy --out ukb22828_c${chr}_v3; "
+done
+
+dx run swiss-army-knife -iin="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/DBP_data/dbp_txt/dbp_snplist.txt" -icmd="${run_merge}" --tag="Step1" --instance-type "mem1_ssd1_v2_x36" --destination="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/DBP_data/dbp_geno_data/" --brief --yes
+
+#########################################################################
+#Run the following PLINK2 codes via Swiss Army Knife on UKB RAP platform 
+#########################################################################
+#Make sure you have uploaded the sbp_merge_list.txt to UKB RAP file path. 
+#The merge list should have a sigle column list containing the following text, "ukb22828_cx_v3" (without the quotations). The column wil have 22 rows for each autosomal chromosomes. Replace "x" with 1-22. 
+
+#merging the pgen files
+
+#Execute the command on Swiss Army Knife interface 
+#inputs are the plink files for the chromosomes and the txt file for the merging chromosomes 
+plink2 --pmerge-list dbp_merge_list.txt pfile --make-pgen --out ukb22828_c1_22_v3_dbp_merged
+
+#Calculate the allele dosage 
+#creating a .raw file for participants with the number of effect allele (0, 1, or 2) for each snp
+# Input the for code below is the merged plink files (pfiles)
+
+plink2 --pfile ukb22828_c1_22_v3_dbp_merged --export A --out ukb22828_dbp_alleles
+
+#Calculate allele frequency 
+
+plink2 --pfile ukb22828_c1_22_v3_dbp_merged --freq --out ukb22828_dbp_allele_freq
+
+\end{lstlisting}
+
+\color{black}
+\newpage
+The last PLINK output files, \textbf{ukb22828\_dbp\_alleles.raw} and \textbf{ukb22828\_dbp\_allele\_freq.afreq}, contain the allele dosage and allele frequency for each of the 208 SNPs. Download these files to your local machine and save them to the \texttt{\$dx\_data\_dbp} file path.
+
+\subsubsubsection{Association of Genetic Variants with Quality-Adjusted Life Years}
+
+We then worked on the association between the genetic variants and QALYs. The QALYs were regressed on the allele dosages, adjusting for age, sex, and the first 10 genetic principal components to account for population stratification.
+\color{violet}
+\begin{stlog}\input{log/25.log.tex}\end{stlog}
+\color{black}
+\subsubsubsection{Data Harmonisation}
+
+We now had the SNP-exposure and SNP-outcome association data. The next task was to harmonize these two datasets. For this, we continued working in the previous R environment.
+
+\begin{lstlisting}[style=Rstyle]
+qaly_hes_data_dbp<-read.csv("C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dbp_snps/snp_qaly_hes_dbp.csv")
+colnames(qaly_hes_data_dbp)<-c("SNP", "other_allele.outcome", "effect_allele.outcome", "eaf.outcome", "outcome", "beta.outcome", "se.outcome", "variance.outcome", "pval.outcome", "samplesize.outcome")
+qaly_hes_data_dbp$id.outcome = "ukb"
+
+harmonise_data_dbp <- harmonise_data(
+  exposure_dat = clumped_dbp_data_2, 
+  outcome_dat = qaly_hes_data_dbp
+)
+
+
+dbp_effect_list<-harmonise_data_dbp%>%select(SNP,effect_allele.exposure,beta.exposure)
+dbp_snplist_exclude<-harmonise_data_dbp%>%filter(mr_keep == "FALSE")%>%select(SNP)
+
+write.table(dbp_effect_list, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/dbp/data/dbp_effect_list.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.table(dbp_snplist_exclude, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/dbp/data/dbp_snplist_exclude.txt", row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+
+\end{lstlisting}
+\color{black}
+\subsubsubsection{Combining the genetic data}
+
+We had now identified the genetic variants primarily associated with SBP and secondarily with DBP, and vice versa. These datasets were then combined.
+\begin{lstlisting}[style=Rstyle]
+
+#We will continue working on the previous environment 
+
+#Let's combine the SNPs that are LD clumped and associted with SBP and DBP to create the SNP list (this is the total sets of SNPs)
+
+sbp_dbp_snplist<-rbind(sbp_snplist, dbp_snplist)
+
+#Let's work on combining SNPs primarily associated with SBP and seconarily associated with DBP
+
+temp_sbp<-harmonise_data%>%select(chr.exposure, pos.exposure, SNP, effect_allele.exposure,other_allele.exposure,beta.exposure,se.exposure,eaf.exposure)
+temp_sbp_2<-harmonise_data_dbp%>%select(chr.exposure, pos.exposure, SNP, effect_allele.exposure,other_allele.exposure, Beta_SBP, se_SBP, EAF_SBP)%>%rename(beta.exposure = Beta_SBP, se.exposure = se_SBP, eaf.exposure = EAF_SBP)
+temp_sbp_append<-rbind(temp_sbp, temp_sbp_2)
+temp_sbp_append<-temp_sbp_append[order(temp_sbp_append$chr.exposure, temp_sbp_append$pos.exposure),]
+temp_sbp_append$beta.exposure<-as.numeric(temp_sbp_append$beta.exposure)
+temp_sbp_append$se.exposure<-as.numeric(temp_sbp_append$se.exposure)
+n_distinct(temp_sbp_append$SNP)
+temp_sbp_na<-temp_sbp_append%>%filter(is.na(beta.exposure))%>%select(SNP)
+mvmr_sbp_snplist_exclude<-rbind(sbp_snplist_exclude, dbp_snplist_exclude, temp_sbp_na)
+mvmr_sbp_effect_list<-temp_sbp_append%>%select(SNP, effect_allele.exposure, beta.exposure)
+
+#Let's work on combining SNPs primarily associated with DBP and seconarily associated with SBP
+
+temp_dbp<-harmonise_data_dbp%>%select(chr.exposure, pos.exposure, SNP, effect_allele.exposure,other_allele.exposure,beta.exposure,se.exposure,eaf.exposure)
+temp_dbp_2<-harmonise_data%>%select(chr.exposure, pos.exposure, SNP, effect_allele.exposure,other_allele.exposure, Beta_DBP, se_DBP, EAF_DBP)%>%rename(beta.exposure = Beta_DBP, se.exposure = se_DBP, eaf.exposure = EAF_DBP)
+temp_dbp_append<-rbind(temp_dbp, temp_dbp_2)
+temp_dbp_append<-temp_dbp_append[order(temp_dbp_append$chr.exposure, temp_dbp_append$pos.exposure),]
+temp_dbp_append$beta.exposure<-as.numeric(temp_dbp_append$beta.exposure)
+temp_dbp_append$se.exposure<-as.numeric(temp_dbp_append$se.exposure)
+temp_dbp_na<-temp_dbp_append%>%filter(is.na(beta.exposure))%>%select(SNP)
+mvmr_dbp_snplist_exclude<-rbind(sbp_snplist_exclude, dbp_snplist_exclude, temp_dbp_na)
+mvmr_dbp_effect_list<-temp_dbp_append%>%select(SNP, effect_allele.exposure, beta.exposure)
+
+#Save the files 
+
+write.table(sbp_dbp_snplist, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp_dbp/data/sbp_dbp_snplist.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.table(mvmr_sbp_snplist_exclude, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp_dbp/data/mvmr_sbp_snplist_exclude.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.table(mvmr_dbp_snplist_exclude, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp_dbp/data/mvmr_dbp_snplist_exclude.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.table(mvmr_sbp_effect_list, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp_dbp/data/mvmr_sbp_effect_list.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.table(mvmr_dbp_effect_list, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/dx_data/sbp_dbp/data/mvmr_dbp_effect_list.txt",row.names = FALSE, col.names =FALSE,quote = FALSE,sep = " ")
+write.csv(temp_sbp_append, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/sbp_dbp_snps/mvmr_sbp.csv", row.names = FALSE)
+write.csv(temp_dbp_append, "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/sbp_dbp_snps/mvmr_dbp.csv", row.names = FALSE)
+
+\end{lstlisting}
+\color{black}
+
+\subsubsubsection{Working on SNPs primarily associated with SBP and seconarily associated with DBP}
+
+We calculated the PRS, allele frequency, and allele dosage for these SNPs using the \textbf{sbp\_dbp\_snplist.txt}, \textbf{mvmr\_sbp\_snplist\_exclude.txt}, and \textbf{mvmr\_sbp\_effect\_list.txt} files.
+
+We had 395 total SNPs; of these, 382 SNPs were associated with SBP as a primary or secondary trait, and 384 SNPs were associated with DBP as a primary or secondary trait. The remaining SNPs were either ambiguous SNPs or had missing effect sizes.
+\begin{lstlisting}[style=BashStyle]
+#########################################################################
+#Run the following PLINK2 codes on Git Bash 
+#########################################################################
+
+#Login through Command Prompt on your Windows machine 
+dx login
+
+#Run the code below on Git Bash
+ 
+dx select --level VIEW 
+#select your project
+# make sure your sbp_dbp_snplist.txt file is uploaded to the UKB RAP. 
+#select the "instance type" you want: this makes sure you have enough computation power (CPU and GPU). 
+#In the command below, I put chromosome 1 to 22 to loop through all autosomal chromosomes just to show the code. But in actuality, I put two chromosomes at a time. This makes sure I have enough computational space and if there is any error, I could adjust the code. 
+
+# Loop over chromosomes 1 to 22 and process each one with the SNP list
+
+run_merge=""
+for chr in {1..22}; do
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.bgen .; "
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.sample .; "
+    run_merge+="plink2 --bgen ukb22828_c${chr}_b0_v3.bgen ref-first --sample ukb22828_c${chr}_b0_v3.sample --extract sbp_dbp_snplist.txt --exclude mvmr_sbp_snplist_exclude.txt --make-pgen --autosome-xy --out ukb22828_c${chr}_v3; "
+done
+
+dx run swiss-army-knife -iin="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_DBP_data/mvmr_sbp_txt/sbp_dbp_snplist.txt" -iin="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_DBP_data/mvmr_sbp_txt/mvmr_sbp_snplist_exclude.txt" -icmd="${run_merge}" --tag="mvmr_chr1_22" --instance-type "mem1_ssd1_v2_x36" --destination="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_DBP_data/mvmr_sbp_geno_data/mvmr_sbp_chromosomes/" --brief --yes
+
+
+#########################################################################
+#Run the following PLINK2 codes via Swiss Army Knife on UKB RAP platform 
+#########################################################################
+#Make sure you have uploaded the sbp_dbp_merge_list.txt to UKB RAP file path. 
+#The merge list should have a sigle column list containing the following text, "ukb22828_cx_v3" (without the quotations). The column wil have 22 rows for each autosomal chromosomes. Replace "x" with 1-22. 
+
+#merging the pgen files
+
+#Execute the command on Swiss Army Knife interface 
+#inputs are the plink files for the chromosomes and the txt file for the merging chromosomes 
+plink2 --pmerge-list sbp_dbp_merge_list.txt pfile --make-pgen --out ukb22828_c1_22_v3_mvmr_sbp_merged
+
+#PRS mvmr_SBP
+plink2 --pfile ukb22828_c1_22_v3_mvmr_sbp_merged --score mvmr_sbp_effect_list.txt cols=+scoresums --out ukb22828_mvmr_sbp_prs
+
+#Calculate the allele dosage 
+#creating a .raw file for participants with the number of effect allele (0, 1, or 2) for each snp
+# Input the for code below is the merged plink files (pfiles)
+
+plink2 --pfile ukb22828_c1_22_v3_mvmr_sbp_merged --export A --out ukb22828_mvmr_sbp_alleles
+
+#Calculate allele frequency 
+
+plink2 --pfile ukb22828_c1_22_v3_mvmr_sbp_merged --freq --out ukb22828_mvmr_sbp_allele_freq
+
+\end{lstlisting}
+
+\color{black}
+
+\subsubsubsection{Working on SNPs primarily associated with DBP and seconarily associated with SBP}
+
+We calculated the PRS, allele frequency, and allele dosage for these SNPs using the \textbf{sbp\_dbp\_snplist.txt}, \textbf{mvmr\_dbp\_snplist\_exclude.txt}, and \textbf{mvmr\_dbp\_effect\_list.txt} files.
+\begin{lstlisting}[style=BashStyle]
+#########################################################################
+#Run the following PLINK2 codes on Git Bash 
+#########################################################################
+
+#Login through Command Prompt on your Windows machine 
+dx login
+
+#Run the code below on Git Bash
+ 
+dx select --level VIEW 
+#select your project
+# make sure your sbp_dbp_snplist.txt file is uploaded to the UKB RAP. 
+#select the "instance type" you want: this makes sure you have enough computation power (CPU and GPU). 
+#In the command below, I put chromosome 1 to 22 to loop through all autosomal chromosomes just to show the code. But in actuality, I put two chromosomes at a time. This makes sure I have enough computational space and if there is any error, I could adjust the code. 
+
+# Loop over chromosomes 1 to 22 and process each one with the SNP list
+
+run_merge=""
+for chr in {1..22}; do
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.bgen .; "
+    run_merge+="cp /mnt/project/Bulk/Imputation/UKB\ imputation\ from\ genotype/ukb22828_c${chr}_b0_v3.sample .; "
+    run_merge+="plink2 --bgen ukb22828_c${chr}_b0_v3.bgen ref-first --sample ukb22828_c${chr}_b0_v3.sample --extract sbp_dbp_snplist.txt --exclude mvmr_dbp_snplist_exclude.txt --make-pgen --autosome-xy --out ukb22828_c${chr}_v3; "
+done
+
+dx run swiss-army-knife -iin="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_DBP_data/mvmr_dbp_txt/sbp_dbp_snplist.txt" -iin="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_DBP_data/mvmr_dbp_txt/mvmr_dbp_snplist_exclude.txt" -icmd="${run_merge}" --tag="mvmr_chr1_22" --instance-type "mem1_ssd1_v2_x36" --destination="project-GpbQqBjJb7jb1vQjf8ZxVpVY:/SBP_DBP_data/mvmr_dbp_geno_data/mvmr_dbp_chromosomes/" --brief --yes
+
+
+#########################################################################
+#Run the following PLINK2 codes via Swiss Army Knife on UKB RAP platform 
+#########################################################################
+#Make sure you have uploaded the sbp_dbp_merge_list.txt to UKB RAP file path. 
+#The merge list should have a sigle column list containing the following text, "ukb22828_cx_v3" (without the quotations). The column wil have 22 rows for each autosomal chromosomes. Replace "x" with 1-22. 
+
+#merging the pgen files
+
+#Execute the command on Swiss Army Knife interface 
+#inputs are the plink files for the chromosomes and the txt file for the merging chromosomes 
+plink2 --pmerge-list sbp_dbp_merge_list.txt pfile --make-pgen --out ukb22828_c1_22_v3_mvmr_dbp_merged
+
+#PRS mvmr_DBP
+plink2 --pfile ukb22828_c1_22_v3_mvmr_dbp_merged --score mvmr_dbp_effect_list.txt cols=+scoresums --out ukb22828_mvmr_dbp_prs
+
+#Calculate the allele dosage 
+#creating a .raw file for participants with the number of effect allele (0, 1, or 2) for each snp
+# Input the for code below is the merged plink files (pfiles)
+
+plink2 --pfile ukb22828_c1_22_v3_mvmr_dbp_merged --export A --out ukb22828_mvmr_dbp_alleles
+
+#Calculate allele frequency 
+
+plink2 --pfile ukb22828_c1_22_v3_mvmr_dbp_merged --freq --out ukb22828_mvmr_dbp_allele_freq
+
+\end{lstlisting}
+
+We have now calculated the PRS for SNPs effect on SBP. Download the \textbf{ukb22828\_sbp\_prs.sscore} file to your local machine and save them to the \texttt{\$dx\_data\_sbp} file path.
+
+\subsubsubsection{Combining Phenotype and Genotype data}
+
+We then combined our phenotype data with the PRS. The \textbf{part\_3b.dta} file contained the phenotype data for our cohort, while the \textbf{ukb22828\_mvmr\_sbp\_prs.sscore} and \textbf{ukb22828\_mvmr\_dbp\_prs.sscore} files contained the PRS for each participant in the UK Biobank. The next Stata code merged the two datasets and prepared the data for the MVMR analysis. We saved the data to the \textbf{part\_4a.dta} Stata file that we had previously created.
+
+\color{violet}
+\begin{stlog}\input{log/26.log.tex}\end{stlog}
+\color{black}
+\subsubsubsection{Analysis}
+
+To estimate the direct effect of SBP on QALYs conditional on DBP, we employed the difference method approach \cite{sanderson2021multivariable}. The total effect ($\beta_1^*$) of SBP on QALYs was estimated in the main analysis. The direct effect ($\beta_1$) of SBP on QALYs was estimated by considering both SBP and DBP traits. At the first stage, we regressed the exposure trait (SBP) on the polygenic risk score (PRS) for SNPs that were associated with SBP (i.e., 382 SNPs). We repeated the same approach for the DBP exposure by regressing it on the PRS for SNPs that were associated with DBP (i.e., 384 SNPs). In the second stage, the outcome (QALYs) was regressed on the predicted values for SBP and DBP from the first-stage models. For the direct effect models, age, sex, UK Biobank assessment centre, genotyping array, and the first 10 genetic principal components for population stratification were used as covariates. The indirect effect was calculated as the difference between the total effect estimate and the direct effect estimate, i.e., $\beta_1^* - \beta_1$.
+\color{violet}
+\begin{stlog}\input{log/27.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsection{Step 7: Tables and Figures}
+
+The codes that were used to generate the main results' tables and figures are provided here.
+
+\subsubsection{Tables}
+\subsubsubsection{Table 1: Background characteristics}
+
+\color{violet}
+\begin{stlog}\input{log/28.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsubsection{Table 2: Main analysis}
+\color{violet}
+\begin{stlog}\input{log/29.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsubsection{Table 3: Sensitivity analyses - No history of antihypertensive medication cohort}
+\color{violet}
+\begin{stlog}\input{log/30.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsubsection{Table 4: Sensitivity analyses - Two-sample MR}
+\color{violet}
+\begin{stlog}\input{log/31.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsubsection{Table 5: Sensitivity analyses - EQ-5D-index from UK Biobank survey}
+\color{violet}
+\begin{stlog}\input{log/32.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsubsection{Table 6: Secondary analysis}
+\color{violet}
+\begin{stlog}\input{log/33.log.tex}\end{stlog}
+\color{black}
+\newpage
+\subsubsection{Figures}
+\subsubsubsection{Figure 1}
+
+Flow chart showing selection criteria for genetic instruments primarily associated with systolic blood pressure
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{MR_SBP.drawio.png}
+  \caption{Flow chart showing selection criteria for genetic instruments primarily associated with systolic blood pressure }
+  \label{fig:1}
+\end{figure}
+
+\color{black}
+\newpage
+\subsubsubsection{Figure 2}
+
+Flow chart showing selection criteria for genetic instruments primarily associated with diastolic blood pressure
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{MR_DBP.drawio.png}
+  \caption{Flow chart showing selection criteria for genetic instruments primarily associated with diastolic blood pressure }
+  \label{fig:2}
+\end{figure}
+\color{black}
+\newpage
+\subsubsubsection{Figure 3}
+
+Figure showing main analysis, and sub-group analyses by age, sex and PRS-free SBP. 
+\begin{lstlisting}[style=Rstyle]
+
+#R plots 
+
+getwd()
+
+#Folder paths
+wd_path = "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/r_codes/r_data"
+data_path = "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/r_codes/r_data"
+png_plot_path = "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/stata_sbp_plot/png"
+pdf_plot_path = "C:/Users/tabe0010/OneDrive - Monash University/MR_backup_file/Articles/Evangelou/new_sbp_snps/stata/stata_sbp_plot/pdf"
+
+#Create MR graphs from main analysis
+setwd(wd_path)
+
+#install.packages("TwoSampleMR", repos = c("https://mrcieu.r-universe.dev", "https://cloud.r-project.org"))
+#install.packages("devtools")
+#devtools::install_github("MRCIEU/MRInstruments")
+#install.packages("data.table")
+
+library(TwoSampleMR)
+library(MRInstruments)
+library(data.table)
+library("ggplot2")
+library(plyr); library(dplyr)
+#install.packages("forestplot")
+library(forestplot)
+
+#######################################################################
+
+#while (dev.cur() > 1) dev.off()
+master_data = read.csv("metan_sbp_r.csv",stringsAsFactors = FALSE)
+qaly_hes<-master_data%>%filter(outcome=="qaly_hes")
+
+x_list_qaly_1 = unique(qaly_hes$outcome)
+qaly_hes = qaly_hes[order(qaly_hes$outcome,qaly_hes$type),]
+tabletext_1 = cbind(unique(qaly_hes$label),(paste(qaly_hes$effect[qaly_hes$type=="Main Analysis MR"],"\n","\n", qaly_hes$effect[qaly_hes$type=="Multivariable Adjusted"],sep="")))
+colnames(tabletext_1)<-c("variable", "effect")
+hrzl_lines = list("1"=gpar(lty=0), "2"=gpar(lty=1),"3"=gpar(lty=1),"4"=gpar(lty=2),"5"=gpar(lty=1),"6"=gpar(lty=2),
+                  "7"=gpar(lty=2),"8"=gpar(lty=2),"9"=gpar(lty=2), "10" =gpar(lty=1), "11" = gpar(lty=2), "12"=gpar(lty=2))
+
+
+
+#png("qaly_hes.png", width = 1000, height = 1000)
+#pdf("qaly_hes.pdf", width = 12, height = 12)
+png(file.path(png_plot_path, "qaly_hes.png"), width = 1000, height = 1000)
+#pdf(file.path(pdf_plot_path, "qaly_hes.pdf"), width = 12, height = 12)
+
+forestplot(tabletext_1, 
+           legend = c("Main Analysis MR","Multivariable Adjusted"),
+           title = "QALYs per year",
+           mean = cbind(qaly_hes$beta[qaly_hes$type == "Main Analysis MR"], qaly_hes$beta[qaly_hes$type == "Multivariable Adjusted"]),
+           lower = cbind(qaly_hes$lower[qaly_hes$type == "Main Analysis MR"], qaly_hes$lower[qaly_hes$type == "Multivariable Adjusted"]),
+           upper = cbind(qaly_hes$upper[qaly_hes$type == "Main Analysis MR"], qaly_hes$upper[qaly_hes$type == "Multivariable Adjusted"]),
+           col=fpColors(box=c("blue", "darkred"),
+                        zero=c("darkblue")),
+           boxsize = 0.1,
+           line.margin = 0.2,
+           #xticks =  c(-5,-4,-3,-2,-1,0,1,2,3),
+           xticks =  c(-3,-2,-1,0,1,2,3),
+           grid = FALSE,
+           hrzl_lines=hrzl_lines,
+           txt_gp = fpTxtGp(xlab=gpar(cex=1.2),
+                            ticks = gpar(cex=1),
+                            summary = gpar(cex=1.5),
+                            title = gpar(cex=1.75),
+                            legend = gpar(cex=1.3),
+                            label = list(gpar(cex=1.2),gpar(1.5),gpar(cex=0.8))),
+           xlab = "Percentage change in QALYs for 10mmHg increase in SBP"
+           
+           
+) %>%
+  fp_add_header(effect = "Estimate (95% CI)")  # Add custom header
+dev.off() 
+
+\end{lstlisting}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{qaly_hes.png}
+  \caption{Mendelian randomisation estimates for QALYs on average year of follow-up}
+  \label{fig:3}
+\end{figure}
+\newpage
+\subsubsubsection{Figure 4}
+
+Associations between SNPs associated with systolic blood pressure and quality adjusted life years. 
+\begin{lstlisting}[style=Rstyle]
+
+#R plots 
+# We will continue working on the previous R plot environment
+
+dat <- read.csv("mr_analysis_sbp.csv", stringsAsFactors = FALSE)
+dat <- rename(dat, beta.outcome = beta_outcome, se.outcome = se_outcome,
+              pval.outcome = pval_outcome, beta.exposure = beta_exposure,
+              se.exposure = se_exposure, id.exposure = id_exposure, id.outcome = id_outcome)
+
+dat$mr_keep <- TRUE
+dat$exposure <- "SBP"
+
+# MR analysis
+setwd(paste(wd_path, sep=""))
+res <- mr(dat)
+p1 <- mr_scatter_plot(res, dat)
+
+x = res[res$method == "Inverse variance weighted" | res$method == "Wald ratio",c("outcome","exposure")]
+
+# Update axis labels, background theme, move legend to bottom, and remove grid for each plot
+for(i in 1:length(p1)){
+  outcome <- res[res$method == "Inverse variance weighted" | res$method == "Wald ratio", "outcome"][i]
+  
+  # Customize the plot with new labels, white background, legend at the bottom, and no grid
+  p1[[i]] <- p1[[i]] +
+    labs(x = "SNP effect on SBP", y = "SNP effect on QALYs") +  # Change these to your desired labels
+    theme_bw() +  # Set background theme to white
+    theme(legend.position = "bottom",  # Move legend to bottom
+          panel.grid = element_blank())  # Remove grid
+  
+  # Save the modified plot
+  #ggsave(p1[[i]], file=paste("IVW - ", outcome, ".png", sep=""), width=7, height=7)
+  ggsave(p1[[i]], filename = paste(png_plot_path, "/IVW - ", outcome, ".png", sep=""), width=7, height=7)
+}
+
+\end{lstlisting}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{IVW - qaly_hes.png}
+  \caption{Associations between SNPs associated with systolic blood pressure and quality adjusted life years. }
+  \label{fig:4}
+\end{figure}
+\color{black}
+\newpage
+\subsubsubsection{Figure 5}
+
+Non-linear MR showing the estimated effects of 1 mmHg increase in SBP on QALYs over an average year of follow-up, across SBP levels. 
+
+A positive value indicates an increase in SBP would increase in QALYs, and vice versa. There was little evidence of nonlinearity in the effect of SBP on QALYs. The SBP thresholds of 120 mmHg (for pre-hypertension SBP) and 140 mmHg (hypertension) are represented with dashed red lines. The green shaded area represents the 95%CI of the estimated effect. Effect estimates are derived from the nonlinear mendelian randomisation model. 
+
+The code for this figure already done in \textbf{Section 4.5.4}.  
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{nl_MR.png}
+  \caption{Estimated effects of 1 mmHg increase in SBP on QALYs over an average year of follow-up, across SBP levels.}
+  \label{fig:5}
+\end{figure}
+\newpage
+\color{black}
+% Bibliography (if needed)
+\bibliographystyle{unsrt}
+\bibliography{lib}
+
+\end{document}
+
